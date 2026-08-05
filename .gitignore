@@ -1,0 +1,6 @@
+# iverilog compiled simulation binaries
+sim
+*.vvp
+
+# waveform dumps
+*.vcd
