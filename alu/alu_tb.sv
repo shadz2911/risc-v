@@ -2,7 +2,7 @@ import alu_pkg::*;
 
 module alu_tb;
     logic [31:0] a, b;
-    logic [2:0] op;
+    logic [3:0] op;
     logic [31:0] result;
     logic zero;
 
@@ -49,6 +49,22 @@ module alu_tb;
         b = 1;
         # 2;
         $display("op=%0d a=%0d b=%0d result=%0d zero=%b", op, a, b, result, zero);
+        op = SLL;
+        a = 3;
+        b = 2;
+        # 2;
+        $display("op=%0d a=%0d b=%0d result=%0d zero=%b", op, a, b, result, zero);
+        op = SRL;
+        a = 8;
+        b = 2;
+        # 2;
+        $display("op=%0d a=%0d b=%0d result=%0d zero=%b", op, a, b, result, zero);
+        op = SRA;
+        a = -8;
+        b = 2;
+        # 2;
+        $display("op=%0d a=%0d b=%0d result=%0d zero=%b", op, $signed(a), b, $signed(result), zero);
+        # 2;
     end
 
 endmodule

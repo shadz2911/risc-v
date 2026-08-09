@@ -3,7 +3,7 @@ import alu_pkg::*;
 module alu(
     input logic [31: 0] a,
     input logic [31: 0] b,
-    input logic [2: 0] op,
+    input logic [3: 0] op,
     output logic [31: 0] result,
     output logic zero
 );
@@ -27,6 +27,15 @@ always_comb begin
         end
         SLT: begin
             result = ($signed(a) < $signed(b)) ? 32'd1 : 32'd0;
+        end
+        SLL: begin
+            result = a << b;
+        end
+        SRL: begin
+            result = a >> b;
+        end
+        SRA: begin
+            result = $signed(a) >>> b;
         end
         default: begin
             result = 0;

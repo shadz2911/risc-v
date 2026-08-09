@@ -31,9 +31,11 @@ instruction imem (
 
 // DECODE
 
-logic regw, memw, memr, branch, is_r;
+logic regw, memw, memr, branch, is_rish;
 alusrc_t alusrc;
-memreg_t memreg;
+memreg_t memregpc;
+regpc_t regpc;
+addjalr_t use_br;
 
 // Control unit
 
@@ -44,8 +46,10 @@ control ctrl (
     .memr(memr),
     .alusrc(alusrc),
     .branch(branch),
-    .memreg(memreg),
-    .is_r(is_r)
+    .memregpc(memregpc),
+    .regpc(regpc),
+    .is_rish(is_rish),
+    .use_br(use_br)
 );
 
 // Register file
@@ -75,11 +79,22 @@ imm_gen immgen (
 
 // EXECUTE
 
-// ALU mux to choose between reg and imm
+// Choose between reg1 and pc
+
+logic [31:0] alu_a;
+
+pc_reg_mux op_mux1 (
+    .register(rdata1),
+    .pc(current_pc),
+    .regpc(regpc),
+    .out(alu_a)
+)
+
+// ALU mux to choose between reg2 and imm
 
 logic [31:0] alu_b;
 
-alu_mux op_mux (
+alu_mux op_mux2 (
     .register(rdata2),
     .immediate(imm),
     .regimm(alusrc),
@@ -91,7 +106,7 @@ alu_mux op_mux (
 ops alu_op;
 
 alu_control aluctrl (
-    .is_r(is_r),
+    .is_rish(is_rish),
     .branch(branch),
     .funct3(instr[14:12]),
     .funct7(instr[31:25]),
@@ -104,7 +119,7 @@ logic [31:0] alu_result;
 logic zero;
 
 alu alu_unit (
-    .a(rdata1),
+    .a(alu_a),
     .b(alu_b),
     .op(alu_op),
     .result(alu_result),
@@ -126,13 +141,6 @@ data dmem (
 
 // WRITEBACK
 
-writeback_mux wb_mux (
-    .alu(alu_result),
-    .mem(mem_rdata),
-    .memalu(memreg),
-    .out(wdata)
-);
-
 // PC NEXT LOGIC
 
 logic [31:0] pc_plus4_val;
@@ -141,6 +149,14 @@ logic [31:0] branch_target;
 pc_plus4 pc4 (
     .pc(current_pc),
     .nextpc(pc_plus4_val)
+);
+
+writeback_mux wb_mux (
+    .alu(alu_result),
+    .mem(mem_rdata),
+    .memalu(memregpc),
+    .pc_plus_4(pc_plus4_val)
+    .out(wdata)
 );
 
 branch_adder branch_add (

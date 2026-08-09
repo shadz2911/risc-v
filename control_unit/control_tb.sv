@@ -21,11 +21,11 @@ module control_tb;
         .alusrc(alusrc),
         .branch(branch),
         .memreg(memreg),
-        .is_r(is_r)
+        .is_rish(is_rish)
     );
 
     alu_control alu_ctrl_dut (
-        .is_r(is_r),
+        .is_rish(is_rish),
         .branch(branch),
         .funct3(funct3),
         .funct7(funct7),
@@ -80,14 +80,46 @@ module control_tb;
         $display("R-SLT:  op=%0d(exp SLT)", op);
 
         // -------------------------------------------------------------
-        // ADDI (opcode=0010011) -- funct3/funct7 irrelevant, is_r should be 0
+        // R-type: SLL (funct3=010)
+        // -------------------------------------------------------------
+        funct3 = 3'b001;
+        #1;
+        $display("R-SLL:  op=%0d(exp SLL)", op);
+
+        // -------------------------------------------------------------
+        // R-type: SRL (funct3=010)
+        // -------------------------------------------------------------
+        funct3 = 3'b101;
+        funct7 = 7'b0000000;
+        #1;
+        $display("R-SRL:  op=%0d(exp SRL)", op);
+
+        // -------------------------------------------------------------
+        // R-type: SRA (funct3=010)
+        // -------------------------------------------------------------
+        funct7 = 7'b0100000;
+        #1;
+        $display("R-SRA:  op=%0d(exp SRA)", op);
+
+        // -------------------------------------------------------------
+        // ADDI (opcode=0010011)
         // -------------------------------------------------------------
         opcode = 7'b0010011;
-        funct3 = 3'b111; // deliberately "wrong" value to prove is_r gates it out
+        funct3 = 3'b000; // deliberately "wrong" value to prove is_r gates it out
         funct7 = 7'b0100000;
         #1;
         $display("ADDI:   regw=%0d(exp1) memw=%0d(exp0) memr=%0d(exp0) alusrc=%0d(exp1=use_imm) branch=%0d(exp0) memreg=%0d(exp0=use_alu) is_r=%0d(exp0) op=%0d(exp=ADD)",
-                  regw, memw, memr, alusrc, branch, memreg, is_r, op);
+                  regw, memw, memr, alusrc, branch, memreg, is_rish, op);
+
+        // -------------------------------------------------------------
+        // SLLI (opcode=0010011)
+        // -------------------------------------------------------------
+        opcode = 7'b0010011;
+        funct3 = 3'b001; // deliberately "wrong" value to prove is_r gates it out
+        funct7 = 7'b0100000;
+        #1;
+        $display("SLLI:   regw=%0d(exp1) memw=%0d(exp0) memr=%0d(exp0) alusrc=%0d(exp1=use_imm) branch=%0d(exp0) memreg=%0d(exp0=use_alu) is_r=%0d(exp0) op=%0d(exp=SLL)",
+                  regw, memw, memr, alusrc, branch, memreg, is_rish, op);
 
         // -------------------------------------------------------------
         // LW (opcode=0000011)
@@ -119,7 +151,7 @@ module control_tb;
         opcode = 7'b1111111;
         #1;
         $display("BAD OP: regw=%0d(exp0) memw=%0d(exp0) memr=%0d(exp0) branch=%0d(exp0) is_r=%0d(exp0)",
-                  regw, memw, memr, branch, is_r);
+                  regw, memw, memr, branch, is_rish);
 
         $finish;
     end
