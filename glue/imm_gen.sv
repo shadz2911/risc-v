@@ -18,7 +18,7 @@ always_comb begin
             imm = {instr[31:12], 12'b0};
         end
         7'b1101111: begin // JAL
-            imm = {{11{instr[31]}}, {instr[31], instr[19:12], instr[20], instr[30:21], 1'b0}}
+            imm = {{11{instr[31]}}, {instr[31], instr[19:12], instr[20], instr[30:21], 1'b0}};
         end
         default: begin
             imm = 0;

@@ -8,7 +8,7 @@ package control_pkg;
     } memreg_t;
 
     typedef enum logic {
-        use_reg = 1'b0, use_pc = 1'b1
+        use_rs1 = 1'b0, use_pc = 1'b1
     } regpc_t;
 
     typedef enum logic {

@@ -1,3 +1,5 @@
+import control_pkg::*;
+
 module pc_next_mux(
     input logic [31:0] pc_plus4,
     input logic [31:0] branch_target,

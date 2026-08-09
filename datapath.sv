@@ -35,7 +35,7 @@ logic regw, memw, memr, branch, is_rish;
 alusrc_t alusrc;
 memreg_t memregpc;
 regpc_t regpc;
-addjalr_t use_br;
+adderjalr_t use_br;
 
 // Control unit
 
@@ -88,7 +88,7 @@ pc_reg_mux op_mux1 (
     .pc(current_pc),
     .regpc(regpc),
     .out(alu_a)
-)
+);
 
 // ALU mux to choose between reg2 and imm
 
@@ -144,6 +144,7 @@ data dmem (
 // PC NEXT LOGIC
 
 logic [31:0] pc_plus4_val;
+logic [31:0] adder_target;
 logic [31:0] branch_target;
 
 pc_plus4 pc4 (
@@ -154,15 +155,22 @@ pc_plus4 pc4 (
 writeback_mux wb_mux (
     .alu(alu_result),
     .mem(mem_rdata),
-    .memalu(memregpc),
-    .pc_plus_4(pc_plus4_val)
+    .memalupc(memregpc),
+    .pc_plus_4(pc_plus4_val),
     .out(wdata)
 );
 
 branch_adder branch_add (
     .pc(current_pc),
     .imm(imm),
-    .nextpc(branch_target)
+    .nextpc(adder_target)
+);
+
+jalr_adder_mux jalr_mux (
+    .jalr(alu_result),
+    .adder(adder_target),
+    .use_br(use_br),
+    .branch_target(branch_target)
 );
 
 pc_next_mux nextpc_mux (
@@ -170,6 +178,7 @@ pc_next_mux nextpc_mux (
     .branch_target(branch_target),
     .branch(branch),
     .zero(zero),
+    .memalupc(memregpc),
     .pc_out(pc_next)
 );
 

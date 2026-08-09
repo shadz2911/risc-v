@@ -22,10 +22,10 @@ always_comb begin
             memr   = 0;
             alusrc = use_reg;
             branch = 0;
-            memreg = use_alu;
+            memregpc = use_alu;
             is_rish = 1;
-            regpc = 0;
-            use_br = 0;
+            regpc = use_rs1;
+            use_br = use_adder;
         end
         7'b0010011: begin // ADDI, SLLI, SRLI, SRAI
             regw   = 1;
@@ -33,10 +33,10 @@ always_comb begin
             memr   = 0;
             alusrc = use_imm;
             branch = 0;
-            memreg = use_alu;
+            memregpc = use_alu;
             is_rish = 1;
-            regpc = 0;
-            use_br = 0;
+            regpc = use_rs1;
+            use_br = use_adder;
         end
         7'b0000011: begin // LW
             regw   = 1;
@@ -44,10 +44,10 @@ always_comb begin
             memr   = 1;
             alusrc = use_imm;
             branch = 0;
-            memreg = use_mem;
+            memregpc = use_mem;
             is_rish = 0;
-            regpc = 0;
-            use_br = 0;
+            regpc = use_rs1;
+            use_br = use_adder;
         end
         7'b0100011: begin // SW
             regw   = 0;
@@ -55,10 +55,10 @@ always_comb begin
             memr   = 0;
             alusrc = use_imm;
             branch = 0;
-            memreg = use_alu;
+            memregpc = use_alu;
             is_rish = 0;
-            regpc = 0;
-            use_br = 0;
+            regpc = use_rs1;
+            use_br = use_adder;
         end
         7'b1100011: begin // BEQ
             regw   = 0;
@@ -66,10 +66,10 @@ always_comb begin
             memr   = 0;
             alusrc = use_reg;
             branch = 1;
-            memreg = use_alu;
+            memregpc = use_alu;
             is_rish = 0;
-            regpc = 0;
-            use_br = 0;
+            regpc = use_rs1;
+            use_br = use_adder;
         end
         7'b0110111: begin // LUI
             regw = 1;
@@ -77,10 +77,10 @@ always_comb begin
             memr = 0;
             alusrc = use_imm;
             branch = 0;
-            memreg = use_alu;
+            memregpc = use_alu;
             is_rish = 0;
-            regpc = 0;
-            use_br = 0;
+            regpc = use_rs1;
+            use_br = use_adder;
         end
         7'b0010111: begin // AUIPC
             regw = 1;
@@ -88,10 +88,10 @@ always_comb begin
             memr = 0;
             alusrc = use_imm;
             branch = 0;
-            memreg = use_alu;
+            memregpc = use_alu;
             is_rish = 0;
-            regpc = 1;
-            use_br = 0;
+            regpc = use_pc;
+            use_br = use_adder;
         end
         7'b1101111: begin // JAL
             regw = 1;
@@ -99,10 +99,10 @@ always_comb begin
             memr = 0;
             alusrc = use_imm;
             branch = 1;
-            memreg = use_pc_plus_4;
+            memregpc = use_pc_plus_4;
             is_rish = 0;
-            regpc = 1;
-            use_br = 0;
+            regpc = use_pc;
+            use_br = use_adder;
         end
         7'b1100111: begin // JALR
             regw = 1;
@@ -110,10 +110,10 @@ always_comb begin
             memr = 0;
             alusrc = use_imm;
             branch = 1;
-            memreg = use_pc_plus_4;
+            memregpc = use_pc_plus_4;
             is_rish = 0;
-            regpc = 0;
-            use_br = 1;
+            regpc = use_rs1;
+            use_br = use_jalr;
         end
         default: begin
             regw   = 0;
@@ -121,9 +121,10 @@ always_comb begin
             memr   = 0;
             alusrc = use_reg;
             branch = 0;
-            memreg = use_alu;
+            memregpc = use_alu;
             is_rish = 0;
-            regpc = 0;
+            regpc = use_rs1;
+            use_br = use_adder;
         end
     endcase
 end

@@ -7,6 +7,6 @@ module pc_reg_mux(
     output logic [31:0] out
 );
 
-assign out = (regpc == use_reg) ? register : pc;
+assign out = (regpc == use_rs1) ? register : pc;
 
 endmodule

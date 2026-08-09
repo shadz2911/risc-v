@@ -4,7 +4,7 @@ import alu_pkg::*;
 module control_tb;
     // control module signals
     logic [6:0] opcode;
-    logic regw, memw, memr, branch, is_r;
+    logic regw, memw, memr, branch, is_rish;
     alusrc_t alusrc;
     memreg_t memreg;
 
@@ -20,7 +20,7 @@ module control_tb;
         .memr(memr),
         .alusrc(alusrc),
         .branch(branch),
-        .memreg(memreg),
+        .memregpc(memreg),
         .is_rish(is_rish)
     );
 
