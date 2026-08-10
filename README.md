@@ -9,27 +9,32 @@ simulation.
 
 ## Supported instructions
 
-- R-type ALU: `ADD`, `SUB`, `AND`, `OR`, `XOR`, `SLT`
-- `ADDI`
+- R-type ALU: `ADD`, `SUB`, `AND`, `OR`, `XOR`, `SLT`, `SLL`, `SRL`, `SRA`
+- I-type ALU: `ADDI`, `ANDI`, `ORI`, `XORI`, `SLTI`, `SLLI`, `SRLI`, `SRAI`
 - `LW`, `SW`
 - `BEQ`
+- `LUI`, `AUIPC`
+- `JAL`, `JALR`
 
-Shifts, other I-type ALU ops (`ANDI`/`ORI`/`XORI`/`SLTI`), the other branch
-variants (`BNE`/`BLT`/`BGE`/`BLTU`/`BGEU`), jumps (`JAL`/`JALR`), and
-`LUI`/`AUIPC` are intentionally out of scope.
+`SLTU`/`SLTIU`, the other branch variants (`BNE`/`BLT`/`BGE`/`BLTU`/`BGEU`),
+and `FENCE`/`ECALL`/`EBREAK` are intentionally out of scope.
 
 ## Layout
 
 ```
-alu/              ALU and its opcode package (alu_pkg)
-control_unit/     Main control unit + ALU control, opcode/alusrc/memreg package (control_pkg)
-register/         32x32 register file (x0 hardwired to 0)
-instruction_mem/  Instruction memory (reads program.hex)
-data_mem/         Data memory
-glue/             PC, adders, muxes, and immediate generator tying it together
-datapath.sv       Top-level module wiring all of the above into a single-cycle core
-datapath_tb.sv    Testbench: loads program.hex and checks final register/memory state
-program.hex       Program image loaded into instruction memory at simulation start
+alu/                  ALU and its opcode package (alu_pkg)
+control_unit/         Main control unit + ALU control, opcode/alusrc/memreg package (control_pkg)
+register/             32x32 register file (x0 hardwired to 0)
+instruction_mem/      Instruction memory (reads program.hex)
+data_mem/             Data memory
+glue/                 PC, adders, muxes, and immediate generator tying it together
+datapath.sv           Top-level module wiring all of the above into a single-cycle core
+datapath_tb.sv        Basic testbench: loads program.hex and checks final register/memory state
+datapath_full_tb.sv   Full instruction-set testbench: loads program_full.hex and asserts
+                      pass/fail on every supported instruction, including branch/jump
+                      control-flow correctness (see header comment in the file)
+program.hex           Program image for datapath_tb.sv
+program_full.hex      Program image for datapath_full_tb.sv, exercising every instruction
 ```
 
 Each module under `alu/`, `control_unit/`, `register/`, `instruction_mem/`,
@@ -45,7 +50,7 @@ erroring, so keep program code and data within that range.
 ## Building and running
 
 Simulated with [Icarus Verilog](http://iverilog.icarus.com/). Run from the
-repo root so `program.hex` resolves correctly:
+repo root so `program.hex`/`program_full.hex` resolve correctly:
 
 ```sh
 iverilog -g2012 -o sim \
@@ -53,10 +58,16 @@ iverilog -g2012 -o sim \
   alu/alu.sv register/register.sv instruction_mem/instruction.sv data_mem/data.sv \
   control_unit/control.sv \
   glue/pc.sv glue/pc_plus4.sv glue/branch_adder.sv glue/imm_gen.sv \
-  glue/alu_src_mux.sv glue/writeback_mux.sv glue/pc_next_mux.sv \
+  glue/alu_src_mux.sv glue/pc_reg_mux.sv glue/jalr_adder_mux.sv \
+  glue/writeback_mux.sv glue/pc_next_mux.sv \
   datapath.sv datapath_tb.sv
 
 vvp sim
 ```
 
-This produces `datapath.vcd`, viewable with a waveform viewer such as GTKWave.
+Swap `datapath_tb.sv` for `datapath_full_tb.sv` to run the full
+instruction-set test instead — it prints a `pass`/`FAIL` line per register
+and a final `ALL CHECKS PASSED` / `N CHECK(S) FAILED` summary.
+
+This produces a `.vcd` waveform dump, viewable with a viewer such as
+GTKWave.
