@@ -5,8 +5,16 @@ module imm_gen(
 
 always_comb begin
     case (instr[6:0])
-        7'b0010011, 7'b0000011, 7'b1100111: begin // ADDI/SLLI/SRLI/SRAI, LW, JALR
+        7'b0000011, 7'b1100111: begin // LW, JALR
             imm = {{20{instr[31]}}, instr[31:20]};
+        end
+        7'b0010011: begin // ADDI/SLLI/SRLI/SRAI
+            if (instr[14:12] == 3'b101) begin
+                imm = {{27{instr[31]}}, instr[24:20]};
+            end
+            else begin
+                imm = {{20{instr[31]}}, instr[31:20]};
+            end
         end
         7'b0100011: begin // SW
             imm = {{20{instr[31]}}, {instr[31:25], instr[11:7]}};
@@ -14,7 +22,7 @@ always_comb begin
         7'b1100011: begin // BEQ
             imm = {{19{instr[31]}}, {instr[31], instr[7], instr[30:25], instr[11:8], 1'b0}};
         end
-        7'b0110111: begin // LUI
+        7'b0110111, 7'b0010111: begin // LUI, AUIPIC
             imm = {instr[31:12], 12'b0};
         end
         7'b1101111: begin // JAL
