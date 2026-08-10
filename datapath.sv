@@ -109,6 +109,7 @@ alu_control aluctrl (
     .is_rish(is_rish),
     .branch(branch),
     .use_br(use_br),
+    .alusrc(alusrc),
     .funct3(instr[14:12]),
     .funct7(instr[31:25]),
     .op(alu_op)

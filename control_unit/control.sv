@@ -135,6 +135,7 @@ module alu_control(
     input logic is_rish,
     input logic branch,
     input logic use_br,
+    input alusrc_t alusrc,
     input logic [2:0] funct3,
     input logic [6:0] funct7,
     output ops op
@@ -152,7 +153,10 @@ always_comb begin
     else if (is_rish) begin
         case(funct3)
             3'b000: begin
-                if (funct7[5]) begin
+                if (alusrc == use_imm) begin
+                    op = ADD;
+                end
+                else if (funct7[5]) begin
                     op = SUB;
                 end
                 else begin

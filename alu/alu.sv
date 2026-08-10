@@ -29,13 +29,13 @@ always_comb begin
             result = ($signed(a) < $signed(b)) ? 32'd1 : 32'd0;
         end
         SLL: begin
-            result = a << b;
+            result = a << b[4:0];
         end
         SRL: begin
-            result = a >> b;
+            result = a >> b[4:0];
         end
         SRA: begin
-            result = $signed(a) >>> b;
+            result = $signed(a) >>> b[4:0];
         end
         default: begin
             result = 0;
