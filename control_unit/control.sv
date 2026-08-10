@@ -134,6 +134,7 @@ endmodule
 module alu_control(
     input logic is_rish,
     input logic branch,
+    input logic use_br,
     input logic [2:0] funct3,
     input logic [6:0] funct7,
     output ops op
@@ -141,7 +142,12 @@ module alu_control(
 
 always_comb begin
     if (branch) begin
-        op = SUB;
+        if (use_br == use_jalr) begin
+            op = ADD;
+        end
+        else begin
+            op = SUB;
+        end
     end
     else if (is_rish) begin
         case(funct3)
