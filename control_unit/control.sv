@@ -77,7 +77,7 @@ always_comb begin
             memr = 0;
             alusrc = use_imm;
             branch = 0;
-            memregpc = use_alu;
+            memregpc = use_immediate;
             is_rish = 0;
             regpc = use_rs1;
             use_br = use_adder;

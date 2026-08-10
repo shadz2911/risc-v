@@ -156,6 +156,7 @@ writeback_mux wb_mux (
     .alu(alu_result),
     .mem(mem_rdata),
     .memalupc(memregpc),
+    .imm(imm),
     .pc_plus_4(pc_plus4_val),
     .out(wdata)
 );

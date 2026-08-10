@@ -4,7 +4,7 @@ package control_pkg;
     } alusrc_t;
 
     typedef enum logic [1:0] {
-        use_alu = 2'b00, use_mem = 2'b01, use_pc_plus_4 = 2'b10
+        use_alu = 2'b00, use_mem = 2'b01, use_pc_plus_4 = 2'b10, use_immediate = 2'b11
     } memreg_t;
 
     typedef enum logic {
