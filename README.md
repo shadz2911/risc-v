@@ -41,6 +41,44 @@ Each module under `alu/`, `control_unit/`, `register/`, `instruction_mem/`,
 and `data_mem/` also has its own standalone testbench for unit-level
 verification.
 
+## Assembler
+
+`utils/assembler.py` is a small two-pass RV32I assembler covering every
+instruction the datapath supports (see above). It reads `program.txt` from
+the current directory and writes the assembled machine code to `program.hex`,
+one 8-digit hex word per line, ready to be loaded by `instruction.sv`.
+
+Syntax mirrors standard RISC-V assembly, e.g.:
+
+```
+    addi x1, x0, 5
+    add  x3, x1, x2
+    sw   x1, 0(x0)
+    lw   x22, 0(x0)
+beq_target:
+    beq  x1, x2, beq_target
+    jal  x25, some_label
+    jalr x26, some_label(x0)
+    lui  x23, 0x12345
+```
+
+Labels are any token ending in `:`, resolved in a first pass before machine
+code is generated; `beq`/`jal` immediates are computed as PC-relative
+offsets from the label address, while `jalr`'s immediate is `rs1 + imm`
+as usual (only PC-relative automatically when the label is combined with a
+`0` base, since `jalr`'s own immediate is never PC-relative by definition).
+
+Run it from the directory containing `program.txt`:
+
+```sh
+python3 utils/assembler.py
+```
+
+`program_full.asm`/`program_full.txt` (plain instructions, no comments) are
+provided as a reference program exercising every supported instruction —
+useful for testing the assembler's output against the known-good
+`program_full.hex` used by `datapath_full_tb.sv`.
+
 ## Memory
 
 Both instruction and data memory are 64 words (256 bytes) deep, word-addressed
