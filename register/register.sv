@@ -22,9 +22,10 @@ always_ff @(posedge clk) begin
     end
 end
 
+// Read after write
 always_comb begin
-    rdata1 = (raddr1 == 0) ? 32'd0 : registers[raddr1];
-    rdata2 = (raddr2 == 0) ? 32'd0 : registers[raddr2];
+    rdata1 = (raddr1 == 0) ? 32'd0 : (wenable && waddr == raddr1) ? wdata : registers[raddr1];
+    rdata2 = (raddr2 == 0) ? 32'd0 : (wenable && waddr == raddr2) ? wdata : registers[raddr2];
 end
     
 endmodule
