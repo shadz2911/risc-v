@@ -11,6 +11,9 @@ module datapath_pipelined (
 logic stall;
 logic flush;
 
+// TODO: drive from hazard_detect.sv once load-use/RAW hazard detection is implemented.
+assign stall = 1'b0;
+
 // FETCH
 
 // Setup pc and pc+4
@@ -296,7 +299,7 @@ data dmem (
 // MEM/WB pipeline register
 
 logic regw_memwb;
-logic [31:0] mem_rdatamemwb, alu_result_memwb, pc_plus4_memwb;
+logic [31:0] mem_rdata_memwb, alu_result_memwb, pc_plus4_memwb;
 logic [4:0] rd_memwb;
 memreg_t memregpc_memwb;
 
