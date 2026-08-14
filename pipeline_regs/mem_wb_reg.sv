@@ -10,12 +10,14 @@ module mem_wb_reg (
     input logic [31:0] mem_rdata_in,
     input logic [31:0] alu_result_in,
     input logic [4:0] rd_in,
+    input logic [31:0] pc_plus4_in,
 
     output logic regw_out,
     output memreg_t memregpc_out,
     output logic [31:0] mem_rdata_out,
     output logic [31:0] alu_result_out,
-    output logic [4:0] rd_out
+    output logic [4:0] rd_out,
+    output logic [31:0] pc_plus4_out
 );
 
 always_ff @(posedge clk) begin

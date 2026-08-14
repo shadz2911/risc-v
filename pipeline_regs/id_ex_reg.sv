@@ -24,6 +24,7 @@ module id_ex_reg (
     input logic [4:0] rd_in,
     input logic [4:0] rs1_in,
     input logic [4:0] rs2_in,
+    input logic [31:0] pc_plus4_in,
 
     output logic regw_out,
     output logic memw_out,
@@ -42,7 +43,8 @@ module id_ex_reg (
     output logic [31:0] current_pc_out,
     output logic [4:0] rd_out,
     output logic [4:0] rs1_out,
-    output logic [4:0] rs2_out
+    output logic [4:0] rs2_out,
+    output logic [31:0] pc_plus4_out
 );
 
 // no need for freezing for load-use and RAW hazards

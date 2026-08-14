@@ -12,6 +12,7 @@ module ex_mem_reg (
     input logic [31:0] alu_result_in,
     input logic [31:0] rdata2_in,
     input logic [4:0] rd_in,
+    input logic [31:0] pc_plus4_in,
 
     output logic regw_out,
     output logic memw_out,
@@ -19,7 +20,8 @@ module ex_mem_reg (
     output memreg_t memregpc_out,
     output logic [31:0] alu_result_out,
     output logic [31:0] rdata2_out,
-    output logic [4:0] rd_out
+    output logic [4:0] rd_out,
+    output logic [31:0] pc_plus4_out
 );
 
 always_ff @(posedge clk) begin
