@@ -11,8 +11,13 @@ module datapath_pipelined (
 logic stall;
 logic flush;
 
-// TODO: drive from hazard_detect.sv once load-use/RAW hazard detection is implemented.
-assign stall = 1'b0;
+hazard_detect hd (
+    .memr_idex(memr_idex),
+    .rd_idex(rd_idex),
+    .instr(instr_ifid),
+
+    .stall(stall)
+);
 
 // FETCH
 
@@ -26,6 +31,7 @@ pc pc_reg (
     .clk(clk),
     .reset(reset),
     .nextaddr(pc_next),
+    .stall(stall),
     .currentaddr(current_pc)
 );
 
@@ -130,7 +136,7 @@ logic [31:0] current_pc_idex, pc_plus4_idex;
 id_ex_reg id_ex (
     .clk(clk),
     .reset(reset),
-    .flush(flush),
+    .flush(bubble),
 
     .regw_in(regw),
     .memw_in(memw),
@@ -199,6 +205,18 @@ alu_mux op_mux2 (
 
 // FORWARDING
 
+// account for lui case where result is alu bypassed
+logic [31:0] alu_result_exmem_fwd;
+
+writeback_mux exmem_fwd_mux (
+    .alu(alu_result_exmem),
+    .mem(mem_rdata),
+    .memalupc(memregpc_exmem),
+    .pc_plus_4(pc_plus4_exmem),
+    .imm(imm_exmem),
+    .out(alu_result_exmem_fwd)
+);
+
 fw_t fw_a, fw_b, fw_r2;
 
 forward_sel fw_sel (
@@ -224,7 +242,7 @@ forward_mux fw_mux (
     .fw_r2(fw_r2),
     .alu_a_raw(alu_a_raw),
     .alu_b_raw(alu_b_raw),
-    .alu_result_exmem(alu_result_exmem),
+    .alu_result_exmem(alu_result_exmem_fwd),
     .rdata2_idex(rdata2_idex),
     .wdata(wdata),
     
@@ -279,8 +297,10 @@ jalr_adder_mux jalr_mux (
 );
 
 logic branch_taken;
+logic bubble;
 assign branch_taken = ((memregpc_idex == use_pc_plus_4) || (branch_idex && zero));
 assign flush = branch_taken;
+assign bubble = branch_taken || stall;
 
 pc_next_mux nextpc_mux (
     .pc_plus4(pc_plus4_val),
@@ -293,7 +313,7 @@ pc_next_mux nextpc_mux (
 
 logic regw_exmem, memw_exmem, memr_exmem;
 memreg_t memregpc_exmem;
-logic [31:0] rdata2_exmem, alu_result_exmem, pc_plus4_exmem;
+logic [31:0] rdata2_exmem, alu_result_exmem, pc_plus4_exmem, imm_exmem;
 logic [4:0] rd_exmem;
 
 ex_mem_reg ex_mem (
@@ -308,6 +328,7 @@ ex_mem_reg ex_mem (
     .rdata2_in(rdata2_temp),
     .rd_in(rd_idex),
     .pc_plus4_in(pc_plus4_idex),
+    .imm_in(imm_idex),
 
     .regw_out(regw_exmem),
     .memw_out(memw_exmem),
@@ -316,7 +337,8 @@ ex_mem_reg ex_mem (
     .alu_result_out(alu_result_exmem),
     .rdata2_out(rdata2_exmem),
     .rd_out(rd_exmem),
-    .pc_plus4_out(pc_plus4_exmem)
+    .pc_plus4_out(pc_plus4_exmem),
+    .imm_out(imm_exmem)
 );
 
 // MEMORY
@@ -335,7 +357,7 @@ data dmem (
 // MEM/WB pipeline register
 
 logic regw_memwb;
-logic [31:0] mem_rdata_memwb, alu_result_memwb, pc_plus4_memwb;
+logic [31:0] mem_rdata_memwb, alu_result_memwb, pc_plus4_memwb, imm_memwb;
 logic [4:0] rd_memwb;
 memreg_t memregpc_memwb;
 
@@ -349,13 +371,15 @@ mem_wb_reg mem_wb (
     .alu_result_in(alu_result_exmem),
     .rd_in(rd_exmem),
     .pc_plus4_in(pc_plus4_exmem),
+    .imm_in(imm_exmem),
 
     .regw_out(regw_memwb),
     .memregpc_out(memregpc_memwb),
     .mem_rdata_out(mem_rdata_memwb),
     .alu_result_out(alu_result_memwb),
     .rd_out(rd_memwb),
-    .pc_plus4_out(pc_plus4_memwb)
+    .pc_plus4_out(pc_plus4_memwb),
+    .imm_out(imm_memwb)
 );
 
 // WRITEBACK
@@ -365,6 +389,7 @@ writeback_mux wb_mux (
     .mem(mem_rdata_memwb),
     .memalupc(memregpc_memwb),
     .pc_plus_4(pc_plus4_memwb),
+    .imm(imm_memwb),
     .out(wdata)
 );
 
