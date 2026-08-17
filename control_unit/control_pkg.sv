@@ -14,4 +14,9 @@ package control_pkg;
     typedef enum logic {
         use_adder = 1'b0, use_jalr = 1'b1
     } adderjalr_t;
+
+    typedef enum logic [1:0] {
+    fw_none = 2'b00, fw_exmem = 2'b01, fw_memwb = 2'b10
+    } fw_t;
+    
 endpackage

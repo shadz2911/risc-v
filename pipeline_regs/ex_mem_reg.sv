@@ -33,6 +33,7 @@ always_ff @(posedge clk) begin
         alu_result_out <= 0;
         rdata2_out <= 0;
         rd_out <= 0;
+        pc_plus4_out <= 0;
     end
     else begin
         regw_out <= regw_in;
@@ -42,6 +43,7 @@ always_ff @(posedge clk) begin
         alu_result_out <= alu_result_in;
         rdata2_out <= rdata2_in;
         rd_out <= rd_in;
+        pc_plus4_out <= pc_plus4_in;
     end
 end
 

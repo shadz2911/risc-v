@@ -177,24 +177,60 @@ id_ex_reg id_ex (
 
 // Choose between reg1 and pc
 
-logic [31:0] alu_a;
+logic [31:0] alu_a_raw;
 
 pc_reg_mux op_mux1 (
     .register(rdata1_idex),
     .pc(current_pc_idex),
     .regpc(regpc_idex),
-    .out(alu_a)
+    .out(alu_a_raw)
 );
 
 // ALU mux to choose between reg2 and imm
 
-logic [31:0] alu_b;
+logic [31:0] alu_b_raw;
 
 alu_mux op_mux2 (
     .register(rdata2_idex),
     .immediate(imm_idex),
     .regimm(alusrc_idex),
-    .out(alu_b)
+    .out(alu_b_raw)
+);
+
+// FORWARDING
+
+fw_t fw_a, fw_b, fw_r2;
+
+forward_sel fw_sel (
+    .regw_exmem(regw_exmem),
+    .regw_memwb(regw_memwb),
+    .rd_exmem(rd_exmem),
+    .rd_memwb(rd_memwb),
+    .rs1_idex(rs1_idex),
+    .rs2_idex(rs2_idex),
+    .regpc_idex(regpc_idex),
+    .alusrc_idex(alusrc_idex),
+
+    .fw_a(fw_a),
+    .fw_b(fw_b),
+    .fw_r2(fw_r2)
+);
+
+logic [31:0] alu_a, alu_b, rdata2_temp;
+
+forward_mux fw_mux (
+    .fw_a(fw_a),
+    .fw_b(fw_b),
+    .fw_r2(fw_r2),
+    .alu_a_raw(alu_a_raw),
+    .alu_b_raw(alu_b_raw),
+    .alu_result_exmem(alu_result_exmem),
+    .rdata2_idex(rdata2_idex),
+    .wdata(wdata),
+    
+    .alu_a(alu_a),
+    .alu_b(alu_b),
+    .r2(rdata2_temp)
 );
 
 // ALU ctrl to choose which op
@@ -257,7 +293,7 @@ pc_next_mux nextpc_mux (
 
 logic regw_exmem, memw_exmem, memr_exmem;
 memreg_t memregpc_exmem;
-logic [31:0] alu_result_exmem, rdata2_exmem, pc_plus4_exmem;
+logic [31:0] rdata2_exmem, alu_result_exmem, pc_plus4_exmem;
 logic [4:0] rd_exmem;
 
 ex_mem_reg ex_mem (
@@ -269,7 +305,7 @@ ex_mem_reg ex_mem (
     .memr_in(memr_idex),
     .memregpc_in(memregpc_idex),
     .alu_result_in(alu_result),
-    .rdata2_in(rdata2_idex),
+    .rdata2_in(rdata2_temp),
     .rd_in(rd_idex),
     .pc_plus4_in(pc_plus4_idex),
 

@@ -69,6 +69,7 @@ always_ff @(posedge clk) begin
         rd_out <= 0;
         rs1_out <= 0;
         rs2_out <= 0;
+        pc_plus4_out <= 0;
     end
     else begin
         regw_out <= regw_in;
@@ -89,6 +90,7 @@ always_ff @(posedge clk) begin
         rd_out <= rd_in;
         rs1_out <= rs1_in;
         rs2_out <= rs2_in;
+        pc_plus4_out <= pc_plus4_in;
     end
 end
 
