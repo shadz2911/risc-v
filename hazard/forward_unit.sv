@@ -67,38 +67,38 @@ module forward_mux (
 
 always_comb begin
     case (fw_a)
-        fw_none: begin
-            alu_a = alu_a_raw;
-        end
         fw_exmem: begin
             alu_a = alu_result_exmem;
         end
         fw_memwb: begin
             alu_a = wdata;
         end
+        default: begin
+            alu_a = alu_a_raw;
+        end
     endcase
 
     case (fw_b)
-        fw_none: begin
-            alu_b = alu_b_raw;
-        end
         fw_exmem: begin
             alu_b = alu_result_exmem;
         end
         fw_memwb: begin
             alu_b = wdata;
         end
+        default: begin
+            alu_b = alu_b_raw;
+        end
     endcase
 
     case (fw_r2)
-        fw_none: begin
-            r2 = rdata2_idex;
-        end
         fw_exmem: begin
             r2 = alu_result_exmem;
         end
         fw_memwb: begin
             r2 = wdata;
+        end
+        default: begin
+            r2 = rdata2_idex;
         end
     endcase
 end
