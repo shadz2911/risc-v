@@ -1,0 +1,27 @@
+# Single-cycle datapath -> Xilinx 7-series synthesis (logic-depth/resource comparison only)
+#
+# Run this from the MASTER branch checkout (or a `git worktree add ../risc-v-singlecycle master`),
+# NOT from the `pipelined` branch -- glue/pc_next_mux.sv is incompatible between branches and
+# datapath.sv on `pipelined` will not elaborate.
+#
+# Invoke from the repo root:
+#   yosys -s synth/xc7_datapath.ys -l synth/xc7_datapath.log
+#
+# program.hex must exist in the repo root before running (see utils/assembler.py).
+#
+# Uses read_slang (bundled with OSS CAD Suite), not the built-in read_verilog -sv --
+# the built-in frontend cannot resolve typedef'd enum types pulled in via
+# `import pkg::*;` (neither as port types nor as internal signal declarations),
+# which this design relies on throughout. read_slang has a complete SV package/import
+# implementation and handles it correctly.
+
+read_slang --top datapath alu/alu_pkg.sv control_unit/control_pkg.sv alu/alu.sv register/register.sv instruction_mem/instruction.sv data_mem/data.sv control_unit/control.sv glue/pc.sv glue/pc_plus4.sv glue/branch_adder.sv glue/imm_gen.sv glue/alu_src_mux.sv glue/pc_reg_mux.sv glue/jalr_adder_mux.sv glue/writeback_mux.sv glue/pc_next_mux.sv datapath.sv
+
+# Elaboration-only smoke test before the (slower, harder-to-debug) synth_xilinx pass.
+hierarchy -check -top datapath
+check
+
+synth_xilinx -family xc7 -top datapath
+
+stat
+ltp

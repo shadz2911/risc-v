@@ -1,0 +1,83 @@
+# 5-stage pipelined datapath -> Xilinx 7-series synthesis (logic-depth/resource comparison only)
+#
+# Run this from the `pipelined` branch checkout.
+#
+# Invoke from the repo root:
+#   yosys -s synth/xc7_datapath_pipelined.ys -l synth/xc7_datapath_pipelined.log
+#
+# program.hex must exist in the repo root before running (see utils/assembler.py).
+#
+# Uses read_slang (bundled with OSS CAD Suite), not the built-in read_verilog -sv --
+# the built-in frontend cannot resolve typedef'd enum types pulled in via
+# `import pkg::*;` (neither as port types nor as internal signal declarations),
+# which this design relies on throughout. read_slang has a complete SV package/import
+# implementation and handles it correctly.
+#
+# --allow-use-before-declare: datapath_pipelined.sv declares each pipeline stage's
+# signals near the instantiation that *produces* them, so earlier instantiations
+# (e.g. the hazard/forwarding units near the top) reference signals declared further
+# down the file. Strict IEEE 1800 requires textual declare-before-use within a scope;
+# Icarus and Vivado both tolerate the forward reference (whole-module declaration
+# collection), so this flag matches that behavior instead of requiring a reorder.
+
+read_slang --top datapath_pipelined --allow-use-before-declare alu/alu_pkg.sv control_unit/control_pkg.sv alu/alu.sv register/register.sv instruction_mem/instruction.sv data_mem/data.sv control_unit/control.sv glue/pc.sv glue/pc_plus4.sv glue/branch_adder.sv glue/imm_gen.sv glue/alu_src_mux.sv glue/pc_reg_mux.sv glue/jalr_adder_mux.sv glue/writeback_mux.sv glue/pc_next_mux.sv hazard/forward_unit.sv hazard/hazard_detect.sv pipeline_regs/if_id_reg.sv pipeline_regs/id_ex_reg.sv pipeline_regs/ex_mem_reg.sv pipeline_regs/mem_wb_reg.sv datapath_pipelined.sv
+
+# Elaboration-only smoke test before the (slower, harder-to-debug) synth_xilinx pass.
+hierarchy -check -top datapath_pipelined
+check
+
+# datapath_pipelined has only clk/reset as ports -- nothing is observable from
+# outside, so without this the optimizer correctly proves the entire design
+# (register file, ALU, every pipeline stage) is dead logic and trims it to
+# nothing (2 IBUFs, 0 LCs). Marking these three signals `keep` pins their
+# entire driving cone in place; between them (writeback data, memory read
+# data, fetch PC) they touch essentially every module in the design.
+# Synthesis-script-only workaround -- no RTL source files are modified.
+select datapath_pipelined/wdata
+setattr -set keep 1
+select datapath_pipelined/mem_rdata
+setattr -set keep 1
+select datapath_pipelined/current_pc
+setattr -set keep 1
+select -clear
+
+synth_xilinx -family xc7 -top datapath_pipelined
+
+# ==== Resource counts, mapped to real xc7 primitives ====
+stat
+
+# ==== Logic-depth proxy metric ====
+#
+# `ltp` after a full synth_xilinx run is not useful here: Xilinx flip-flops are
+# already mapped to FDRE primitives by that point, and `ltp -noff`'s FF-exclusion
+# only recognizes yosys's *generic* pre-techmap flop cell types ($dff/$adff/etc) --
+# it does not recognize FDRE, so it walks straight through every register in the
+# design (confirmed: a 2-FF test case gave a path spanning through both flops
+# instead of stopping at the first one). The result is a meaningless hop-count
+# across register boundaries, not combinational depth.
+#
+# Fix: re-elaborate the design fresh and stop synth_xilinx right after the
+# map_cells stage, before its map_ffs stage legalizes/techmaps flops into FDRE
+# (see `synth_xilinx -help` for the full stage list). At that checkpoint flops
+# are still generic $dff cells, which -noff DOES recognize and correctly treats
+# as path boundaries (confirmed on the same 2-FF test case: it stops right at
+# the first flop). Caveat: this checkpoint is also before the map_luts stage, so
+# combinational logic here is still generic gates, not LUT-packed -- this number
+# is register-bounded *gate-level* depth, not LUT-level depth. It is still a
+# valid apples-to-apples relative indicator against the single-cycle datapath.ys
+# script, since both are measured the same way.
+design -reset
+
+read_slang --top datapath_pipelined --allow-use-before-declare alu/alu_pkg.sv control_unit/control_pkg.sv alu/alu.sv register/register.sv instruction_mem/instruction.sv data_mem/data.sv control_unit/control.sv glue/pc.sv glue/pc_plus4.sv glue/branch_adder.sv glue/imm_gen.sv glue/alu_src_mux.sv glue/pc_reg_mux.sv glue/jalr_adder_mux.sv glue/writeback_mux.sv glue/pc_next_mux.sv hazard/forward_unit.sv hazard/hazard_detect.sv pipeline_regs/if_id_reg.sv pipeline_regs/id_ex_reg.sv pipeline_regs/ex_mem_reg.sv pipeline_regs/mem_wb_reg.sv datapath_pipelined.sv
+
+select datapath_pipelined/wdata
+setattr -set keep 1
+select datapath_pipelined/mem_rdata
+setattr -set keep 1
+select datapath_pipelined/current_pc
+setattr -set keep 1
+select -clear
+
+synth_xilinx -family xc7 -top datapath_pipelined -run :map_cells
+
+ltp -noff
