@@ -34,6 +34,7 @@ module register_tb;
         wenable = 1;
         wdata = 125;
         @(posedge clk);
+        #1;
         wenable = 0;
 
         raddr1 = 15;

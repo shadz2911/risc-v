@@ -1,8 +1,8 @@
 # risc-v
 
-A RISC-V (RV32I subset) core implemented in SystemVerilog, in two flavors:
-a single-cycle datapath and a 5-stage pipelined datapath with forwarding
-and hazard detection.
+A RISC-V (RV32I subset) core implemented in SystemVerilog: a 5-stage
+pipelined datapath with forwarding and hazard detection. (A single-cycle
+version of the same core lives on the `master` branch.)
 
 ## Supported instructions
 
@@ -14,32 +14,24 @@ and hazard detection.
 - `JAL`, `JALR`
 
 `SLTU`/`SLTIU`, the other branch variants (`BNE`/`BLT`/`BGE`/`BLTU`/`BGEU`),
-and `FENCE`/`ECALL`/`EBREAK` are intentionally out of scope. Both the
-single-cycle and pipelined cores support the same subset.
+and `FENCE`/`ECALL`/`EBREAK` are intentionally out of scope.
 
 ## Layout
 
 ```
-alu/                  ALU and its opcode package (alu_pkg)
-control_unit/         Main control unit + ALU control, opcode/alusrc/memreg package (control_pkg)
-register/             32x32 register file (x0 hardwired to 0)
-instruction_mem/      Instruction memory (reads program.hex)
-data_mem/             Data memory
-glue/                 PC, adders, muxes, and immediate generator tying it together
-pipeline_regs/        IF/ID, ID/EX, EX/MEM, MEM/WB pipeline registers
-hazard/                forward_unit.sv (EX/MEM and MEM/WB forwarding) and
-                       hazard_detect.sv (load-use stall detection)
-datapath.sv            Top-level module wiring the single-cycle core
-datapath_pipelined.sv  Top-level module wiring the 5-stage pipelined core
-datapath_tb.sv         Basic single-cycle testbench: loads program.hex and checks
-                        final register/memory state
-datapath_full_tb.sv    Full instruction-set testbench for the single-cycle core:
-                        loads program_full.hex and asserts pass/fail on every
-                        supported instruction, including branch/jump control-flow
-                        correctness (see header comment in the file)
-tests/                 Testbenches for the pipelined core (see Testing, below)
-program.hex             Program image for datapath_tb.sv
-program_full.hex        Program image for datapath_full_tb.sv, exercising every instruction
+alu/                ALU and its opcode package (alu_pkg)
+control_unit/       Main control unit + ALU control, opcode/alusrc/memreg package (control_pkg)
+register/           32x32 register file (x0 hardwired to 0)
+instruction_mem/    Instruction memory (reads program.hex)
+data_mem/           Data memory
+glue/               PC, adders, muxes, branch comparator, and immediate generator tying it together
+pipeline_regs/      IF/ID, ID/EX, EX/MEM, MEM/WB pipeline registers
+hazard/             forward_unit.sv (EX/MEM and MEM/WB forwarding) and
+                    hazard_detect.sv (load-use stall detection)
+datapath/           datapath_pipelined.sv, the top-level module wiring the whole core together
+tests/              Testbenches for the core (see Testing, below)
+top/                Board-level top module + XDC constraints for real FPGA bring-up
+synth/              Yosys script for xc7 resource/logic-depth estimates outside Vivado
 ```
 
 Each module under `alu/`, `control_unit/`, `register/`, `instruction_mem/`,
@@ -48,10 +40,9 @@ verification.
 
 ## Pipelining
 
-`datapath_pipelined.sv` reuses every module from the single-cycle core,
-splitting execution across 5 stages (fetch, decode, execute, memory,
-writeback) connected by the pipeline registers in `pipeline_regs/`. Two
-hazard classes need explicit handling:
+`datapath_pipelined.sv` splits execution across 5 stages (fetch, decode,
+execute, memory, writeback) connected by the pipeline registers in
+`pipeline_regs/`. Three hazard classes need explicit handling:
 
 **Data hazards (forwarding).** `hazard/forward_unit.sv` forwards a
 producer's result to a consumer's EX stage without waiting for it to reach
@@ -94,10 +85,25 @@ the wrongly-fetched instruction never executes. `flush` and the load-use
 branch, so a single combined signal driving both stall and flush would
 zero out the instruction IF/ID is supposed to be holding.
 
+`flush` doesn't force any pipeline register's data fields to a squashed
+value directly — each pipeline register instead carries a `valid` bit,
+set by `flush` at capture time and passed through unchanged by every
+later stage. Whatever a squashed instruction's `regw`/`memw`/`branch`/
+`memregpc` fields happen to hold is only ever acted on after being ANDed
+with the matching `valid` bit, at each real point of consequence
+(`branch_taken`, `forward_sel`'s two forwarding-eligibility checks, and
+both `wenable`s). This exists because `flush` sits at the end of a long
+combinational chain (forwarding → ALU → branch decision) and forcing it
+to fan out to every field of a wide pipeline register directly was the
+dominant cost in the design's critical path; a single `valid` bit costs
+far less to distribute; a dedicated `branch_compare` module also
+computes the branch condition directly (`a == b`) instead of routing it
+through the general ALU, for the same reason.
+
 ## Testing
 
-`tests/` holds testbenches for the pipelined core, each loading its own
-program image and reporting pass/fail per check plus a final summary:
+`tests/` holds testbenches for the core, each loading its own program
+image and reporting pass/fail per check plus a final summary:
 
 - **`skeleton_tb.sv`** — smoke test for the datapath skeleton before
   forwarding/hazard handling existed: ADDI/ADD/SW/LW and a taken BEQ, with
@@ -106,13 +112,12 @@ program image and reporting pass/fail per check plus a final summary:
   forwarding into both ALU operands, store-data forwarding (`fw_r2`) at
   both distances, forwarding priority, and forwarding into both operands of
   a branch comparison.
-- **`complete_tests.sv`** — a full-pipeline stress test built around
-  `program_full.asm`'s instruction-coverage sequence (every supported
-  instruction, checkpointed to memory since it's a copy of a program
-  written for the single-cycle core, and register reuse everywhere else,
-  since instruction memory is capped at 64 words) plus explicit load-use
-  stalling, store-data forwarding, forwarding priority, branch-operand
-  forwarding, and a flush immediately followed by a load-use stall.
+- **`complete_tests.sv`** — a full-pipeline stress test covering every
+  supported instruction, checkpointed to memory (since instruction memory
+  is capped at 64 words, results need to survive register reuse) plus
+  explicit load-use stalling, store-data forwarding, forwarding priority,
+  branch-operand forwarding, and a flush immediately followed by a
+  load-use stall.
 - **`hazard_matrix_tests.sv`** — the exhaustive version, split into 5
   independent phases (each under the 64-word instruction limit,
   sequentially loaded and run against a freshly reset DUT) covering: every
@@ -164,24 +169,33 @@ Run it from the directory containing `program.txt`:
 python3 utils/assembler.py
 ```
 
-`program_full.asm`/`program_full.txt` (plain instructions, no comments) are
-provided as a reference program exercising every supported instruction —
-useful for testing the assembler's output against the known-good
-`program_full.hex` used by `datapath_full_tb.sv`.
-
 ## Memory
 
 Both instruction and data memory are 64 words (256 bytes) deep, word-addressed
 via `addr[7:2]`. Addresses at or beyond `0x100` wrap around instead of
-erroring, so keep program code and data within that range. This applies to
-both cores, and it's the reason the pipelined tests either checkpoint results
-to memory and reuse registers, or split into multiple independently-loaded
-phases, rather than writing one long program.
+erroring, so keep program code and data within that range — it's the reason
+the tests either checkpoint results to memory and reuse registers, or split
+into multiple independently-loaded phases, rather than writing one long
+program.
+
+Neither the register file nor data memory clear their storage on `reset` —
+only the pipeline registers and PC do. A synchronous reset that clears an
+entire memory array every cycle prevents an FPGA synthesis tool from
+mapping it to a real distributed-RAM/BRAM primitive (no such primitive can
+bulk-clear itself), forcing a much more expensive flip-flop-based
+implementation instead. Real hardware still comes up zeroed on power-on
+regardless (Xilinx FPGAs zero-initialize BRAM/LUTRAM by default), so this
+only changes behavior for a *second* reset mid-run, which matches how real
+CPUs treat general-purpose registers anyway (undefined after reset, not
+architecturally guaranteed to be zero). The testbenches compensate for this
+in simulation by explicitly clearing both hierarchically wherever a test
+needs a guaranteed-fresh DUT (Icarus doesn't model power-on-zero the way
+real silicon does).
 
 ## Building and running
 
 Simulated with [Icarus Verilog](http://iverilog.icarus.com/). Run from the
-repo root so `program.hex`/`program_full.hex` resolve correctly:
+repo root:
 
 ```sh
 iverilog -g2012 -o sim \
@@ -190,38 +204,34 @@ iverilog -g2012 -o sim \
   control_unit/control.sv \
   glue/pc.sv glue/pc_plus4.sv glue/branch_adder.sv glue/imm_gen.sv \
   glue/alu_src_mux.sv glue/pc_reg_mux.sv glue/jalr_adder_mux.sv \
-  glue/writeback_mux.sv glue/pc_next_mux.sv \
-  datapath.sv datapath_tb.sv
+  glue/writeback_mux.sv glue/pc_next_mux.sv glue/branch_compare.sv \
+  hazard/forward_unit.sv hazard/hazard_detect.sv \
+  pipeline_regs/if_id_reg.sv pipeline_regs/id_ex_reg.sv pipeline_regs/ex_mem_reg.sv pipeline_regs/mem_wb_reg.sv \
+  datapath/datapath_pipelined.sv tests/hazard_matrix_tests.sv
 
 vvp sim
 ```
 
-Swap `datapath_tb.sv` for `datapath_full_tb.sv` to run the full
-instruction-set test instead — it prints a `pass`/`FAIL` line per register
-and a final `ALL CHECKS PASSED` / `N CHECK(S) FAILED` summary.
-
-This produces a `.vcd` waveform dump, viewable with a viewer such as
-GTKWave.
-
-### Pipelined core
-
-The pipelined core needs the pipeline registers and hazard/forwarding units
-in addition to the modules above:
-
-```sh
-iverilog -g2012 -o sim_pipelined \
-  alu/alu_pkg.sv control_unit/control_pkg.sv \
-  alu/alu.sv register/register.sv instruction_mem/instruction.sv data_mem/data.sv \
-  control_unit/control.sv \
-  glue/pc.sv glue/pc_plus4.sv glue/branch_adder.sv glue/imm_gen.sv \
-  glue/alu_src_mux.sv glue/pc_reg_mux.sv glue/jalr_adder_mux.sv \
-  glue/writeback_mux.sv glue/pc_next_mux.sv \
-  hazard/forward_unit.sv hazard/hazard_detect.sv \
-  pipeline_regs/if_id_reg.sv pipeline_regs/id_ex_reg.sv pipeline_regs/ex_mem_reg.sv pipeline_regs/mem_wb_reg.sv \
-  datapath_pipelined.sv tests/hazard_matrix_tests.sv
-
-vvp sim_pipelined
-```
-
 Swap `tests/hazard_matrix_tests.sv` for any other testbench in `tests/` to
-run it instead.
+run it instead. This produces a `.vcd` waveform dump, viewable with a
+viewer such as GTKWave.
+
+## Synthesis
+
+`synth/xc7_datapath_pipelined.ys` is a Yosys script targeting Xilinx
+7-series (`synth_xilinx -family xc7`), used for resource/logic-depth
+estimates independent of Vivado. See the comments at the top of the script
+for usage and its known caveats (it needs `read_slang` rather than the
+built-in `read_verilog -sv`, and a couple of flags to match this design's
+coding style — both explained inline).
+
+## Hardware bring-up
+
+`top/top_pipelined_basys3.sv` is a thin wrapper exposing `clk`/`reset`/
+`leds` for a real board — `datapath_pipelined`'s only observable output is
+`leds` (the low 4 bits of the current PC), which exists purely so a real
+synthesis run has something to keep instead of optimizing the whole design
+away as unobservable dead logic. `top/basys3.xdc` has the matching pin
+constraints (clock, center pushbutton for `reset`, 4 LEDs) for a Digilent
+Basys 3 board — swap the `PACKAGE_PIN` values for a different board's
+pinout.

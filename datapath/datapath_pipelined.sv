@@ -46,7 +46,7 @@ hazard_detect hd (
 logic [31:0] current_pc;
 logic [31:0] pc_next;
 logic [31:0] pc_plus4_val;
-assign leds = current_pc [3:0] ;
+assign leds = current_pc[3:0];
 
 pc pc_reg (
     .clk(clk),
@@ -291,14 +291,13 @@ alu_control aluctrl (
 // ALU unit to execute op
 
 logic [31:0] alu_result;
-logic zero;
 
 alu alu_unit (
     .a(alu_a),
     .b(alu_b),
     .op(alu_op),
     .result(alu_result),
-    .zero(zero)
+    .zero()
 );
 
 logic beq;
