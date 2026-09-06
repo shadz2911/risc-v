@@ -71,31 +71,25 @@ always_ff @(posedge clk) begin
         rs2_out <= 0;
         pc_plus4_out <= 0;
     end
-    else if (flush) begin
-        // Only squash the control bits that could make a bubble architecturally
-        // visible: register writeback, memory write, and both ways this stage can
-        // signal a taken branch/jump (branch_out&&zero, and memregpc_out==use_pc_plus_4).
-        // memr_out is squashed too so a bubble can't trip hazard_detect's load-use
-        // stall on garbage rd_out. Every other field is safe to leave holding
-        // whatever garbage was already latched, since nothing downstream ever acts
-        // on it without one of these five gating it. This keeps flush's fan-out to
-        // 5 narrow fields instead of all ~19 fields (195 bits) of this register --
-        // that full-width fan-out from a signal at the end of a ~20-level
-        // forward/ALU/branch chain was the dominant term in the design's critical
-        // path (Vivado's worst paths land on this register's reset pins).
-        regw_out <= 0;
-        memw_out <= 0;
-        memr_out <= 0;
-        branch_out <= 0;
-        memregpc_out <= use_alu;
-    end
     else begin
-        regw_out <= regw_in;
-        memw_out <= memw_in;
-        memr_out <= memr_in;
+        // flush only squashes the control bits; everything else loads
+        // unconditionally so flush's fan-out stays limited to these 5 fields
+        if (flush) begin
+            regw_out <= 0;
+            memw_out <= 0;
+            memr_out <= 0;
+            branch_out <= 0;
+            memregpc_out <= use_alu;
+        end
+        else begin
+            regw_out <= regw_in;
+            memw_out <= memw_in;
+            memr_out <= memr_in;
+            branch_out <= branch_in;
+            memregpc_out <= memregpc_in;
+        end
+
         alusrc_out <= alusrc_in;
-        branch_out <= branch_in;
-        memregpc_out <= memregpc_in;
         regpc_out <= regpc_in;
         is_rish_out <= is_rish_in;
         use_br_out <= use_br_in;
