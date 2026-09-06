@@ -12,15 +12,18 @@ module datapath_pipelined (
 logic [31:0] instr_ifid;
 logic memr_idex;
 logic [4:0] rd_idex, rs1_idex, rs2_idex;
+logic valid_idex;
 logic bubble;
 logic regw_exmem, memw_exmem, memr_exmem;
 memreg_t memregpc_exmem;
 logic [31:0] rdata2_exmem, alu_result_exmem, pc_plus4_exmem, imm_exmem;
 logic [4:0] rd_exmem;
+logic valid_exmem;
 logic regw_memwb;
 logic [31:0] mem_rdata_memwb, alu_result_memwb, pc_plus4_memwb, imm_memwb;
 logic [4:0] rd_memwb;
 memreg_t memregpc_memwb;
+logic valid_memwb;
 logic [31:0] mem_rdata;
 
 // PIPELINE CONTROL SIGNALS
@@ -29,7 +32,7 @@ logic stall;
 logic flush;
 
 hazard_detect hd (
-    .memr_idex(memr_idex),
+    .memr_idex(memr_idex && valid_idex),
     .rd_idex(rd_idex),
     .instr(instr_ifid),
 
@@ -71,6 +74,7 @@ instruction imem (
 
 logic [31:0] pc_plus4_ifid;
 logic [31:0] current_pc_ifid;
+logic valid_ifid;
 
 if_id_reg if_id (
     .clk(clk),
@@ -84,7 +88,8 @@ if_id_reg if_id (
 
     .instr_out(instr_ifid),
     .pc_plus4_out(pc_plus4_ifid),
-    .current_pc_out(current_pc_ifid)
+    .current_pc_out(current_pc_ifid),
+    .valid_out(valid_ifid)
 );
 
 // DECODE
@@ -120,7 +125,7 @@ register regfile (
     .reset(reset),
     .waddr(rd_memwb),
     .wdata(wdata),
-    .wenable(regw_memwb),
+    .wenable(regw_memwb && valid_memwb),
     .raddr1(instr_ifid[19:15]),
     .raddr2(instr_ifid[24:20]),
     .rdata1(rdata1),
@@ -153,6 +158,7 @@ id_ex_reg id_ex (
     .clk(clk),
     .reset(reset),
     .flush(bubble),
+    .valid_in(valid_ifid),
 
     .regw_in(regw),
     .memw_in(memw),
@@ -192,7 +198,8 @@ id_ex_reg id_ex (
     .rd_out(rd_idex),
     .rs1_out(rs1_idex),
     .rs2_out(rs2_idex),
-    .pc_plus4_out(pc_plus4_idex)
+    .pc_plus4_out(pc_plus4_idex),
+    .valid_out(valid_idex)
 );
 
 // EXECUTE
@@ -236,8 +243,8 @@ writeback_mux exmem_fwd_mux (
 fw_t fw_a, fw_b, fw_r2;
 
 forward_sel fw_sel (
-    .regw_exmem(regw_exmem),
-    .regw_memwb(regw_memwb),
+    .regw_exmem(regw_exmem && valid_exmem),
+    .regw_memwb(regw_memwb && valid_memwb),
     .rd_exmem(rd_exmem),
     .rd_memwb(rd_memwb),
     .rs1_idex(rs1_idex),
@@ -313,7 +320,7 @@ jalr_adder_mux jalr_mux (
 );
 
 logic branch_taken;
-assign branch_taken = ((memregpc_idex == use_pc_plus_4) || (branch_idex && zero));
+assign branch_taken = valid_idex && ((memregpc_idex == use_pc_plus_4) || (branch_idex && zero));
 assign flush = branch_taken;
 assign bubble = branch_taken || stall;
 
@@ -329,6 +336,7 @@ pc_next_mux nextpc_mux (
 ex_mem_reg ex_mem (
     .clk(clk),
     .reset(reset),
+    .valid_in(valid_idex),
 
     .regw_in(regw_idex),
     .memw_in(memw_idex),
@@ -348,7 +356,8 @@ ex_mem_reg ex_mem (
     .rdata2_out(rdata2_exmem),
     .rd_out(rd_exmem),
     .pc_plus4_out(pc_plus4_exmem),
-    .imm_out(imm_exmem)
+    .imm_out(imm_exmem),
+    .valid_out(valid_exmem)
 );
 
 // MEMORY
@@ -358,7 +367,7 @@ data dmem (
     .reset(reset),
     .addr(alu_result_exmem),
     .wdata(rdata2_exmem),
-    .wenable(memw_exmem),
+    .wenable(memw_exmem && valid_exmem),
     .rdata(mem_rdata)
 );
 
@@ -367,6 +376,7 @@ data dmem (
 mem_wb_reg mem_wb (
     .clk(clk),
     .reset(reset),
+    .valid_in(valid_exmem),
 
     .regw_in(regw_exmem),
     .memregpc_in(memregpc_exmem),
@@ -382,7 +392,8 @@ mem_wb_reg mem_wb (
     .alu_result_out(alu_result_memwb),
     .rd_out(rd_memwb),
     .pc_plus4_out(pc_plus4_memwb),
-    .imm_out(imm_memwb)
+    .imm_out(imm_memwb),
+    .valid_out(valid_memwb)
 );
 
 // WRITEBACK

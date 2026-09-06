@@ -5,6 +5,7 @@ module id_ex_reg (
     input logic clk,
     input logic reset,
     input logic flush,
+    input logic valid_in,
 
     input logic regw_in,
     input logic memw_in,
@@ -44,7 +45,8 @@ module id_ex_reg (
     output logic [4:0] rd_out,
     output logic [4:0] rs1_out,
     output logic [4:0] rs2_out,
-    output logic [31:0] pc_plus4_out
+    output logic [31:0] pc_plus4_out,
+    output logic valid_out
 );
 
 // no need for freezing for load-use and RAW hazards
@@ -70,25 +72,14 @@ always_ff @(posedge clk) begin
         rs1_out <= 0;
         rs2_out <= 0;
         pc_plus4_out <= 0;
+        valid_out <= 0;
     end
     else begin
-        // flush only squashes the control bits; everything else loads
-        // unconditionally so flush's fan-out stays limited to these 5 fields
-        if (flush) begin
-            regw_out <= 0;
-            memw_out <= 0;
-            memr_out <= 0;
-            branch_out <= 0;
-            memregpc_out <= use_alu;
-        end
-        else begin
-            regw_out <= regw_in;
-            memw_out <= memw_in;
-            memr_out <= memr_in;
-            branch_out <= branch_in;
-            memregpc_out <= memregpc_in;
-        end
-
+        regw_out <= regw_in;
+        memw_out <= memw_in;
+        memr_out <= memr_in;
+        branch_out <= branch_in;
+        memregpc_out <= memregpc_in;
         alusrc_out <= alusrc_in;
         regpc_out <= regpc_in;
         is_rish_out <= is_rish_in;
@@ -103,6 +94,7 @@ always_ff @(posedge clk) begin
         rs1_out <= rs1_in;
         rs2_out <= rs2_in;
         pc_plus4_out <= pc_plus4_in;
+        valid_out <= !flush && valid_in;
     end
 end
 
