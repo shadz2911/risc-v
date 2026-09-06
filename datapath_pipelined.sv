@@ -3,8 +3,25 @@ import alu_pkg::*;
 
 module datapath_pipelined (
     input logic clk,
-    input logic reset
+    input logic reset,
+    output logic [3:0] leds
 );
+
+// THINGS TO DECLARE EARLY
+
+logic [31:0] instr_ifid;
+logic memr_idex;
+logic [4:0] rd_idex, rs1_idex, rs2_idex;
+logic bubble;
+logic regw_exmem, memw_exmem, memr_exmem;
+memreg_t memregpc_exmem;
+logic [31:0] rdata2_exmem, alu_result_exmem, pc_plus4_exmem, imm_exmem;
+logic [4:0] rd_exmem;
+logic regw_memwb;
+logic [31:0] mem_rdata_memwb, alu_result_memwb, pc_plus4_memwb, imm_memwb;
+logic [4:0] rd_memwb;
+memreg_t memregpc_memwb;
+logic [31:0] mem_rdata;
 
 // PIPELINE CONTROL SIGNALS
 
@@ -26,6 +43,7 @@ hazard_detect hd (
 logic [31:0] current_pc;
 logic [31:0] pc_next;
 logic [31:0] pc_plus4_val;
+assign leds = current_pc [3:0] ;
 
 pc pc_reg (
     .clk(clk),
@@ -51,7 +69,6 @@ instruction imem (
 
 // IF/ID pipeline register
 
-logic [31:0] instr_ifid;
 logic [31:0] pc_plus4_ifid;
 logic [31:0] current_pc_ifid;
 
@@ -121,12 +138,11 @@ imm_gen immgen (
 
 // ID/EX pipeline register
 
-logic regw_idex, memw_idex, memr_idex, branch_idex, is_rish_idex;
+logic regw_idex, memw_idex, branch_idex, is_rish_idex;
 alusrc_t alusrc_idex;
 memreg_t memregpc_idex;
 regpc_t regpc_idex;
 adderjalr_t use_br_idex;
-logic [4:0] rd_idex, rs1_idex, rs2_idex;
 logic [31:0] rdata1_idex, rdata2_idex;
 logic [31:0] imm_idex;
 logic [2:0] funct3_idex;
@@ -297,7 +313,6 @@ jalr_adder_mux jalr_mux (
 );
 
 logic branch_taken;
-logic bubble;
 assign branch_taken = ((memregpc_idex == use_pc_plus_4) || (branch_idex && zero));
 assign flush = branch_taken;
 assign bubble = branch_taken || stall;
@@ -310,11 +325,6 @@ pc_next_mux nextpc_mux (
 );
 
 // EX/MEM pipeline register
-
-logic regw_exmem, memw_exmem, memr_exmem;
-memreg_t memregpc_exmem;
-logic [31:0] rdata2_exmem, alu_result_exmem, pc_plus4_exmem, imm_exmem;
-logic [4:0] rd_exmem;
 
 ex_mem_reg ex_mem (
     .clk(clk),
@@ -343,8 +353,6 @@ ex_mem_reg ex_mem (
 
 // MEMORY
 
-logic [31:0] mem_rdata;
-
 data dmem (
     .clk(clk),
     .reset(reset),
@@ -355,11 +363,6 @@ data dmem (
 );
 
 // MEM/WB pipeline register
-
-logic regw_memwb;
-logic [31:0] mem_rdata_memwb, alu_result_memwb, pc_plus4_memwb, imm_memwb;
-logic [4:0] rd_memwb;
-memreg_t memregpc_memwb;
 
 mem_wb_reg mem_wb (
     .clk(clk),
