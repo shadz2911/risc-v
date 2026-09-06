@@ -301,6 +301,14 @@ alu alu_unit (
     .zero(zero)
 );
 
+logic beq;
+
+branch_compare br_cmp (
+    .a(alu_a),
+    .b(alu_b),
+    .beq(beq)
+);
+
 // Branch decision logic
 
 logic [31:0] adder_target;
@@ -320,7 +328,7 @@ jalr_adder_mux jalr_mux (
 );
 
 logic branch_taken;
-assign branch_taken = valid_idex && ((memregpc_idex == use_pc_plus_4) || (branch_idex && zero));
+assign branch_taken = valid_idex && ((memregpc_idex == use_pc_plus_4) || (branch_idex && beq));
 assign flush = branch_taken;
 assign bubble = branch_taken || stall;
 
