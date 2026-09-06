@@ -50,7 +50,7 @@ module id_ex_reg (
 // no need for freezing for load-use and RAW hazards
 
 always_ff @(posedge clk) begin
-    if (reset || flush) begin
+    if (reset) begin
         regw_out <= 0;
         memw_out <= 0;
         memr_out <= 0;
@@ -70,6 +70,24 @@ always_ff @(posedge clk) begin
         rs1_out <= 0;
         rs2_out <= 0;
         pc_plus4_out <= 0;
+    end
+    else if (flush) begin
+        // Only squash the control bits that could make a bubble architecturally
+        // visible: register writeback, memory write, and both ways this stage can
+        // signal a taken branch/jump (branch_out&&zero, and memregpc_out==use_pc_plus_4).
+        // memr_out is squashed too so a bubble can't trip hazard_detect's load-use
+        // stall on garbage rd_out. Every other field is safe to leave holding
+        // whatever garbage was already latched, since nothing downstream ever acts
+        // on it without one of these five gating it. This keeps flush's fan-out to
+        // 5 narrow fields instead of all ~19 fields (195 bits) of this register --
+        // that full-width fan-out from a signal at the end of a ~20-level
+        // forward/ALU/branch chain was the dominant term in the design's critical
+        // path (Vivado's worst paths land on this register's reset pins).
+        regw_out <= 0;
+        memw_out <= 0;
+        memr_out <= 0;
+        branch_out <= 0;
+        memregpc_out <= use_alu;
     end
     else begin
         regw_out <= regw_in;

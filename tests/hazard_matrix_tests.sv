@@ -170,6 +170,12 @@ module hazard_matrix_tests;
     task automatic run_phase(int cycles);
         reset = 1;
         repeat (2) @(posedge clk);
+        // register.sv/data.sv no longer clear their storage on reset (that loop forced
+        // FF-based synthesis instead of LUTRAM/BRAM inference); replicate the old
+        // reset-clears-everything behavior here instead, since every phase in this
+        // file expects a genuinely fresh DUT.
+        for (int i = 0; i < 32; i++) dut.regfile.registers[i] = 0;
+        for (int i = 0; i < 64; i++) dut.dmem.datas[i] = 0;
         reset = 0;
         repeat (cycles) @(posedge clk);
         #1;

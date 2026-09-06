@@ -156,6 +156,11 @@ module complete_tests;
 
         reset = 1;
         repeat (2) @(posedge clk);
+        // register.sv/data.sv no longer clear their storage on reset (that loop forced
+        // FF-based synthesis instead of LUTRAM/BRAM inference); replicate the old
+        // reset-clears-everything behavior here instead.
+        for (int i = 0; i < 32; i++) dut.regfile.registers[i] = 0;
+        for (int i = 0; i < 64; i++) dut.dmem.datas[i] = 0;
         reset = 0;
 
         // 61 instructions plus ~6 load-use stall cycles and pipeline drain.

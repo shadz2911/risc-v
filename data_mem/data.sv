@@ -12,11 +12,7 @@ logic [5:0] word_index;
 assign word_index = addr[7:2];
 
 always_ff @(posedge clk) begin
-    if (reset) begin
-        for (int i = 0; i < 64; i = i + 1) begin
-            datas[i] <= 0;
-        end
-    end else if (wenable) begin
+    if (wenable) begin
         datas[word_index] <= wdata;
     end
 end

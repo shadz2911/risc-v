@@ -13,11 +13,7 @@ module register(
 logic [31:0] registers [0:31];
 
 always_ff @(posedge clk) begin
-    if (reset) begin
-        for (int i = 0; i < 32; i = i + 1) begin
-            registers[i] <= 0;
-        end
-    end else if (wenable && waddr != 0) begin
+    if (wenable && waddr != 0) begin
         registers[waddr] <= wdata;
     end
 end
