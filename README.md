@@ -235,3 +235,31 @@ away as unobservable dead logic. `top/basys3.xdc` has the matching pin
 constraints (clock, center pushbutton for `reset`, 4 LEDs) for a Digilent
 Basys 3 board — swap the `PACKAGE_PIN` values for a different board's
 pinout.
+
+## Implementation results (Vivado)
+
+`top_pipelined_basys3` implemented in Vivado for the Basys 3's Artix-7
+(`xc7a35t`, `-1` speed grade) with the 100 MHz board clock
+(`top/basys3.xdc`, 10.00 ns period).
+
+**Utilization** — 1417 LUTs (~6.8% of the 20800 available), 1622 flip-flops
+(~3.9% of 41600), and 6 bonded IOBs. At 64 words deep each, the register file
+and data memory map to distributed/LUT RAM (32 LUTs as memory) rather than
+BRAM.
+
+![Vivado utilization report](docs/vivado_utilization.png)
+
+**Timing** — all constraints met: WNS +0.566 ns, WHS +0.134 ns, WPWS
++3.750 ns, 0 failing endpoints across 3034 setup endpoints. The +0.566 ns
+setup slack at a 10 ns period corresponds to a max clock of roughly 106 MHz;
+the critical path runs from the EX/MEM ALU-result register through the
+forwarding path and back. Getting here took the pipeline changes described
+under *Control hazards* above plus Vivado's performance-oriented
+implementation strategy (see the commit history).
+
+![Vivado timing summary](docs/vivado_timing.png)
+
+**Power** — 0.125 W total on-chip (0.053 W dynamic, 0.072 W device static)
+from vectorless analysis.
+
+![Vivado power report](docs/vivado_power.png)
