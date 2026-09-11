@@ -31,6 +31,13 @@ logic [31:0] mem_rdata;
 logic stall;
 logic flush;
 
+// Branch prediction outputs
+
+logic predict_taken, hit;
+logic [31:0] target;
+
+// Hazard detection
+
 hazard_detect hd (
     .memr_idex(memr_idex && valid_idex),
     .rd_idex(rd_idex),
@@ -75,6 +82,9 @@ instruction imem (
 logic [31:0] pc_plus4_ifid;
 logic [31:0] current_pc_ifid;
 logic valid_ifid;
+logic predict_taken_ifid;
+logic hit_ifid;
+logic [31:0] target_ifid;
 
 if_id_reg if_id (
     .clk(clk),
@@ -85,11 +95,17 @@ if_id_reg if_id (
     .instr_in(instr),
     .pc_plus4_in(pc_plus4_val),
     .current_pc_in(current_pc),
+    .predict_taken_in(predict_taken),
+    .hit_in(hit),
+    .target_in(target),
 
     .instr_out(instr_ifid),
     .pc_plus4_out(pc_plus4_ifid),
     .current_pc_out(current_pc_ifid),
-    .valid_out(valid_ifid)
+    .valid_out(valid_ifid),
+    .predict_taken_out(predict_taken_ifid),
+    .hit_out(hit_ifid),
+    .target_out(target_ifid)
 );
 
 // DECODE
@@ -153,6 +169,9 @@ logic [31:0] imm_idex;
 logic [2:0] funct3_idex;
 logic [6:0] funct7_idex;
 logic [31:0] current_pc_idex, pc_plus4_idex;
+logic predict_taken_idex;
+logic hit_idex;
+logic [31:0] target_idex;
 
 id_ex_reg id_ex (
     .clk(clk),
@@ -179,6 +198,9 @@ id_ex_reg id_ex (
     .rs1_in(instr_ifid[19:15]),
     .rs2_in(instr_ifid[24:20]),
     .pc_plus4_in(pc_plus4_ifid),
+    .predict_taken_in(predict_taken_ifid),
+    .hit_in(hit_ifid),
+    .target_in(target_ifid),
 
     .regw_out(regw_idex),
     .memw_out(memw_idex),
@@ -199,7 +221,10 @@ id_ex_reg id_ex (
     .rs1_out(rs1_idex),
     .rs2_out(rs2_idex),
     .pc_plus4_out(pc_plus4_idex),
-    .valid_out(valid_idex)
+    .valid_out(valid_idex),
+    .predict_taken_out(predict_taken_idex),
+    .hit_out(hit_idex),
+    .target_out(target_idex)
 );
 
 // EXECUTE
@@ -326,16 +351,51 @@ jalr_adder_mux jalr_mux (
     .branch_target(branch_target)
 );
 
+// Branch says if its a branch instruction
+// memregpc_idex is use_alu for BEQ and use_pc_plus_4 for JAL and JALR
+
 logic branch_taken;
 assign branch_taken = valid_idex && ((memregpc_idex == use_pc_plus_4) || (branch_idex && beq));
-assign flush = branch_taken;
-assign bubble = branch_taken || stall;
+assign flush = (branch_taken && (!predict_taken_idex
+    || predict_taken_idex && (!hit_idex || (branch_target != target_idex))))
+    || (!branch_taken && predict_taken_idex && hit_idex);
+assign bubble = flush || stall;
 
 pc_next_mux nextpc_mux (
     .pc_plus4(pc_plus4_val),
     .branch_target(branch_target),
     .branch_taken(branch_taken),
+    .predict_taken(predict_taken),
+    .hit(hit),
+    .target(target),
+    .flush(flush),
+    .pc_plus4_idex(pc_plus4_idex),
     .pc_out(pc_next)
+);
+
+// PHT and BTB modules
+
+pht pht_unit (
+    .clk(clk),
+    .reset(reset),
+    .pc_read(current_pc[6:2]),
+    .pc_write(current_pc_idex[6:2]),
+    .wr_en(branch_idex && (memregpc_idex == use_alu) && valid_idex),
+    .true_taken(branch_taken),
+
+    .predict_taken(predict_taken)
+);
+
+btb btb_unit (
+    .clk(clk),
+    .reset(reset),
+    .pc_read(current_pc[5:2]),
+    .pc_write(current_pc_idex[5:2]),
+    .true_taken(branch_taken && (memregpc_idex == use_alu) && valid_idex),
+    .true_addr(pc_next),
+
+    .hit(hit),
+    .target(target)
 );
 
 // EX/MEM pipeline register

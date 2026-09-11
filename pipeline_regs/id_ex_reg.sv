@@ -26,6 +26,9 @@ module id_ex_reg (
     input logic [4:0] rs1_in,
     input logic [4:0] rs2_in,
     input logic [31:0] pc_plus4_in,
+    input logic predict_taken_in,
+    input logic hit_in,
+    input logic [31:0] target_in,
 
     output logic regw_out,
     output logic memw_out,
@@ -46,7 +49,10 @@ module id_ex_reg (
     output logic [4:0] rs1_out,
     output logic [4:0] rs2_out,
     output logic [31:0] pc_plus4_out,
-    output logic valid_out
+    output logic valid_out,
+    output logic predict_taken_out,
+    output logic hit_out,
+    output logic [31:0] target_out
 );
 
 // no need for freezing for load-use and RAW hazards
@@ -73,6 +79,9 @@ always_ff @(posedge clk) begin
         rs2_out <= 0;
         pc_plus4_out <= 0;
         valid_out <= 0;
+        predict_taken_out <= 0;
+        hit_out <= 0;
+        target_out <= 0;
     end
     else begin
         regw_out <= regw_in;
@@ -94,6 +103,9 @@ always_ff @(posedge clk) begin
         rs1_out <= rs1_in;
         rs2_out <= rs2_in;
         pc_plus4_out <= pc_plus4_in;
+        predict_taken_out <= predict_taken_in;
+        hit_out <= hit_in;
+        target_out <= target_in;
         valid_out <= !flush && valid_in;
     end
 end
