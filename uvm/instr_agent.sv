@@ -8,7 +8,7 @@ class instr_agent extends uvm_agent;
 
 instr_sequencer sequencer;
 instr_driver driver;
-// monitor comes later, once we're building Phase 2
+instr_monitor monitor;
 
 function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -18,6 +18,7 @@ function void build_phase(uvm_phase phase);
     super.build_phase(phase);
     sequencer = instr_sequencer::type_id::create("sequencer", this);
     driver = instr_driver::type_id::create("driver", this);
+    monitor = instr_monitor::type_id::create("monitor", this);
 endfunction
 
 function void connect_phase(uvm_phase phase);
