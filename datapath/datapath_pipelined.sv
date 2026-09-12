@@ -389,8 +389,8 @@ pht pht_unit (
 btb btb_unit (
     .clk(clk),
     .reset(reset),
-    .pc_read(current_pc[5:2]),
-    .pc_write(current_pc_idex[5:2]),
+    .pc_read(current_pc),
+    .pc_write(current_pc_idex),
     .true_taken(branch_taken && (memregpc_idex == use_alu) && valid_idex),
     .true_addr(pc_next),
 
