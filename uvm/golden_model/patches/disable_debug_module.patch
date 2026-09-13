@@ -1,0 +1,17 @@
+diff --git a/riscv/sim.cc b/riscv/sim.cc
+index cfc99168..d69f2939 100644
+--- a/riscv/sim.cc
++++ b/riscv/sim.cc
+@@ -73,7 +73,11 @@ sim_t::sim_t(const cfg_t *cfg, bool halted,
+ 
+   sout_.rdbuf(std::cerr.rdbuf()); // debug output goes to stderr by default
+ 
+-  bus.add_device(DEBUG_START, &debug_module);
++  // Patched out for this project: the debug module unconditionally
++  // reserves [0x0, 0x1000), which blocks placing our own memory at
++  // address 0 to match the DUT's zero-based addressing. We don't use
++  // Spike's debug/JTAG features here, only as a golden-model ISS.
++  // bus.add_device(DEBUG_START, &debug_module);
+ 
+   socketif = NULL;
+ #ifdef HAVE_BOOST_ASIO

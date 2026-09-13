@@ -15,7 +15,7 @@ initial clk = 0;
 always #5 clk = ~clk;
 
 initial begin
-    run_test();
+    run_test("instr_test");
 end
 
 endmodule

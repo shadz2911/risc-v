@@ -192,6 +192,68 @@ in simulation by explicitly clearing both hierarchically wherever a test
 needs a guaranteed-fresh DUT (Icarus doesn't model power-on-zero the way
 real silicon does).
 
+## UVM environment (in progress)
+
+`uvm/` holds a constrained-random UVM testbench, checked against
+[Spike](https://github.com/riscv-software-src/riscv-isa-sim) (added as a
+git submodule) as an independent golden model.
+
+**Spike patch (required).** Spike unconditionally reserves address
+`0x0`–`0xFFF` for its debug module (`bus.add_device(DEBUG_START, ...)`
+in `riscv/sim.cc`, `DEBUG_START` is `0x0` in `riscv/platform.h`), with
+no command-line flag to disable it. This project doesn't use Spike's
+debug/JTAG features at all, and needs address `0` free so Spike's
+memory map can match the DUT's own zero-based addressing. The one-line
+fix is saved as `uvm/golden_model/patches/disable_debug_module.patch`.
+Run `uvm/golden_model/setup_spike.sh` (idempotent — safe to re-run) to
+init the submodule, apply the patch, and build in one step, rather than
+driving `configure`/`make` by hand — a fresh submodule checkout has the
+patch un-applied, and nothing else enforces re-applying it before a
+plain `make` would silently build the unpatched, broken version.
+
+**Addressing.** The generator's 64-word program is assembled and linked
+to start at address `0x0` — identical to the DUT's own instruction
+memory — so branch/jump targets and PC-derived register values (`JAL`'s
+return address, `AUIPC`'s `pc + imm`) match the DUT exactly, with no
+translation needed. A small fixed epilogue (`lui x31, 0x80010` then
+`jal x0, _start`) runs *after* the 64 real words, at a known fixed
+address, and jumps back to `0x0` before anything else executes — so the
+real program is never shifted by this setup code either. The
+scoreboard's trace parser ignores commits at or past that epilogue
+address (`>= 0x100`) when building its expected-results queue.
+
+Data addresses are the one exception, and need a real workaround: Spike
+is a single unified address space, while the DUT has physically
+separate instruction and data memories that happen to share the same
+*numeric* addresses — so data can't also live at `0x0` in Spike without
+aliasing the program's own instruction bytes (a store could silently
+corrupt code Spike would later re-fetch, something that can never
+happen on the real, Harvard-architecture DUT). Data instead lives at
+`0x80010000` in Spike, and `LW`/`SW` are constrained to always address
+relative to `x0` (never a forwarded/computed base register) so the
+generator can predictably rewrite that `x0` to `x31` — pre-loaded with
+the real base by the epilogue — when translating for Spike specifically.
+This narrows what the *randomized* environment can generate for
+memory-op addressing — forwarded/computed store and load addresses are
+still covered exhaustively by the hand-written tests in `tests/`.
+
+`JALR` is constrained the same way (`rs1` forced to `x0`), but for a
+different reason: its `rs1 + imm` target now matches the DUT correctly
+regardless of what `rs1` holds (code addressing is identical on both
+sides), but a dynamic, uncontrolled `rs1` could still produce a target
+that isn't 4-byte aligned, which Spike (strict RV32I, no compressed-
+instruction extension) traps on — `BEQ`/`JAL`/`JALR` immediates are all
+constrained to keep targets 4-byte aligned for the same reason.
+
+**Results.** Random testing against Spike caught real correctness bugs
+invisible to the existing directed tests — most notably, the control
+unit accepted illegal branch/`JALR` encodings that real RV32I (and
+Spike) reject outright. With those fixed, ~60% of random seeds now run
+fully clean end to end; the rest hit a known limitation in Spike itself
+(its trace goes silent on tight repeating loops without a `tohost`
+handshake) rather than a DUT bug. Functional coverage (opcode / funct3 /
+`x0`-as-source-or-dest) lands between 81% and 100% per seed.
+
 ## Building and running
 
 Simulated with [Icarus Verilog](http://iverilog.icarus.com/). Run from the

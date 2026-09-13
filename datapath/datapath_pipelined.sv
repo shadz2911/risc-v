@@ -358,7 +358,7 @@ logic branch_taken;
 assign branch_taken = valid_idex && ((memregpc_idex == use_pc_plus_4) || (branch_idex && beq));
 assign flush = (branch_taken && (!predict_taken_idex
     || predict_taken_idex && (!hit_idex || (branch_target != target_idex))))
-    || (!branch_taken && predict_taken_idex && hit_idex);
+    || (valid_idex && !branch_taken && predict_taken_idex && hit_idex);
 assign bubble = flush || stall;
 
 pc_next_mux nextpc_mux (

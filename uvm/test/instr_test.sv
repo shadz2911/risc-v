@@ -18,6 +18,10 @@ endfunction
 
 task run_phase(uvm_phase phase);
     instr_sequence seq;
+    // Runs until the scoreboard flags a repeat retirement (see its
+    // `wrapped` comment) rather than a fixed count -- an early loop can
+    // revisit a low address well before any fixed count is reached.
+    localparam int SPIKE_BUDGET = 128;
 
     phase.raise_objection(this);
 
@@ -29,8 +33,10 @@ task run_phase(uvm_phase phase);
     seq = instr_sequence::type_id::create("seq");
     seq.start(env.agent.sequencer);
 
+    env.scoreboard.run_spike("prog", SPIKE_BUDGET);
+
     tb_top.reset = 0;
-    repeat (500) @(posedge tb_top.clk);
+    while (!env.scoreboard.wrapped) @(posedge tb_top.clk);
     #1;
 
     phase.drop_objection(this);
