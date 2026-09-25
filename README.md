@@ -28,10 +28,14 @@ glue/               PC, adders, muxes, branch comparator, and immediate generato
 pipeline_regs/      IF/ID, ID/EX, EX/MEM, MEM/WB pipeline registers
 hazard/             forward_unit.sv (EX/MEM and MEM/WB forwarding) and
                     hazard_detect.sv (load-use stall detection)
+branch_predictor/   pht.sv (2-bit saturating counters) and btb.sv (tagged branch target buffer)
 datapath/           datapath_pipelined.sv, the top-level module wiring the whole core together
 tests/              Testbenches for the core (see Testing, below)
 top/                Board-level top module + XDC constraints for real FPGA bring-up
 synth/              Yosys script for xc7 resource/logic-depth estimates outside Vivado
+axi_lite/           Standalone AXI4-Lite master + testbench (not yet wired into the datapath)
+uvm/                Constrained-random UVM environment checked against Spike (see below)
+utils/              Two-pass assembler used to build the test programs
 ```
 
 Each module under `alu/`, `control_unit/`, `register/`, `instruction_mem/`,
@@ -76,13 +80,16 @@ matches either source register of the instruction in IF/ID) and asserts
 `stall`, which freezes the PC and IF/ID register for one cycle while a
 bubble is inserted into ID/EX.
 
-**Control hazards (flushing).** A taken branch or jump is only resolved in
-EX, one stage after the next instruction has already been fetched. On a
-taken branch/JAL/JALR, `datapath_pipelined.sv` flushes IF/ID (`flush`) so
-the wrongly-fetched instruction never executes. `flush` and the load-use
+**Control hazards (flushing).** A branch or jump is only resolved in EX,
+two stages after it was fetched. Fetch follows the branch predictor's guess
+(see *Branch prediction*, below); when EX finds that guess was wrong — a
+taken branch/JAL/JALR that wasn't predicted taken with the right target, or
+a branch predicted taken that wasn't — `datapath_pipelined.sv` asserts
+`flush`, squashing the wrongly-fetched instructions and redirecting the PC
+to the real target (or back to the branch's `pc + 4`). `flush` and the load-use
 `stall` bubble are separate signals — IF/ID needs to *hold* during a stall
-(it already has its own `stall` input for that) but *flush* during a taken
-branch, so a single combined signal driving both stall and flush would
+(it already has its own `stall` input for that) but *flush* on a
+mispredict, so a single combined signal driving both stall and flush would
 zero out the instruction IF/ID is supposed to be holding.
 
 `flush` doesn't force any pipeline register's data fields to a squashed
@@ -99,6 +106,42 @@ dominant cost in the design's critical path; a single `valid` bit costs
 far less to distribute; a dedicated `branch_compare` module also
 computes the branch condition directly (`a == b`) instead of routing it
 through the general ALU, for the same reason.
+
+## Branch prediction
+
+`BEQ` is predicted dynamically in fetch by two structures in
+`branch_predictor/`, both looked up with the current fetch PC:
+
+- **`pht.sv`** — a 32-entry pattern history table of 2-bit saturating
+  counters, indexed by `pc[6:2]` and reset to strongly-not-taken. It
+  answers *whether* to take the branch.
+- **`btb.sv`** — a 16-entry, direct-mapped, tagged branch target buffer.
+  It answers *where* to go; a tag mismatch is a miss, so an unrelated
+  instruction aliasing to the same index is never redirected.
+
+Fetch redirects to the BTB's target only when the BTB hits *and* the PHT
+predicts taken; otherwise it falls through to `pc + 4`. The branch's
+prediction (`predict_taken`, `hit`, `target`) travels down the pipeline
+alongside it, and EX compares it against the real outcome to decide
+whether to `flush` (see *Control hazards*, above).
+
+Both tables are trained from EX, using only valid `BEQ`s: the PHT counter
+moves toward the actual outcome on every executed `BEQ`, and the BTB
+records the target of every taken one. The BTB is written with
+`branch_target` — the target EX just computed — not `pc_next`. The two
+only agree on a mispredict: on a *correct* prediction there's no flush,
+so `pc_next` is whatever fetch is doing that cycle, and training on it
+would make each correct prediction overwrite its own BTB entry with a bad
+target. The BTB's write port is registered one cycle before it touches the
+table to keep this path out of the critical path. `JAL`/`JALR` aren't
+predicted yet; every taken jump costs a flush.
+
+The predictor only affects performance, never correctness — a
+misprediction is recovered by the same flush that would otherwise handle an
+unpredicted branch — so the pass/fail testbenches in `tests/` can't tell a
+working predictor from a broken one. To check it, count flushes: a 20-iteration
+`BEQ` loop should mispredict 3 times (twice while the counter warms up from
+strongly-not-taken, once on loop exit).
 
 ## Testing
 
@@ -269,6 +312,7 @@ iverilog -g2012 -o sim \
   glue/writeback_mux.sv glue/pc_next_mux.sv glue/branch_compare.sv \
   hazard/forward_unit.sv hazard/hazard_detect.sv \
   pipeline_regs/if_id_reg.sv pipeline_regs/id_ex_reg.sv pipeline_regs/ex_mem_reg.sv pipeline_regs/mem_wb_reg.sv \
+  branch_predictor/pht.sv branch_predictor/btb.sv \
   datapath/datapath_pipelined.sv tests/hazard_matrix_tests.sv
 
 vvp sim
@@ -302,7 +346,8 @@ pinout.
 
 `top_pipelined_basys3` implemented in Vivado for the Basys 3's Artix-7
 (`xc7a35t`, `-1` speed grade) with the 100 MHz board clock
-(`top/basys3.xdc`, 10.00 ns period).
+(`top/basys3.xdc`, 10.00 ns period). These results predate the branch
+predictor and haven't been re-run since it was added.
 
 **Utilization** — 1417 LUTs (~6.8% of the 20800 available), 1622 flip-flops
 (~3.9% of 41600), and 6 bonded IOBs. At 64 words deep each, the register file

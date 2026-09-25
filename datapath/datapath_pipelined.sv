@@ -375,12 +375,16 @@ pc_next_mux nextpc_mux (
 
 // PHT and BTB modules
 
+// BEQ is the only instruction with branch set and memregpc == use_alu
+logic is_beq_idex;
+assign is_beq_idex = valid_idex && branch_idex && (memregpc_idex == use_alu);
+
 pht pht_unit (
     .clk(clk),
     .reset(reset),
     .pc_read(current_pc[6:2]),
     .pc_write(current_pc_idex[6:2]),
-    .wr_en(branch_idex && (memregpc_idex == use_alu) && valid_idex),
+    .wr_en(is_beq_idex),
     .true_taken(branch_taken),
 
     .predict_taken(predict_taken)
@@ -391,8 +395,8 @@ btb btb_unit (
     .reset(reset),
     .pc_read(current_pc),
     .pc_write(current_pc_idex),
-    .true_taken(branch_taken && (memregpc_idex == use_alu) && valid_idex),
-    .true_addr(pc_next),
+    .true_taken(branch_taken && is_beq_idex),
+    .true_addr(branch_target),
 
     .hit(hit),
     .target(target)
