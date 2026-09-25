@@ -4,6 +4,20 @@ A RISC-V (RV32I subset) core implemented in SystemVerilog: a 5-stage
 pipelined datapath with forwarding and hazard detection. (A single-cycle
 version of the same core lives on the `master` branch.)
 
+**Highlights**
+
+- **5-stage pipeline** with EX/MEM and MEM/WB forwarding, load-use stalling,
+  and flush-on-mispredict
+- **Dynamic branch prediction** — 2-bit saturating-counter PHT plus a tagged BTB
+- **Timing closure at 100 MHz** on a Basys 3 (Artix-7): +0.566 ns slack,
+  ~106 MHz max, ~1.4k LUTs\*
+- **Constrained-random UVM testbench** checked against
+  [Spike](https://github.com/riscv-software-src/riscv-isa-sim) as a golden
+  model, which caught decode bugs the directed tests missed
+- **Directed hazard-matrix suite** covering every forwarding distance,
+  stall/flush overlap, and forwarding-priority case
+- **Custom two-pass assembler** (Python) used to build every test program
+
 ## Supported instructions
 
 - R-type ALU: `ADD`, `SUB`, `AND`, `OR`, `XOR`, `SLT`, `SLL`, `SRL`, `SRA`
@@ -342,12 +356,11 @@ constraints (clock, center pushbutton for `reset`, 4 LEDs) for a Digilent
 Basys 3 board — swap the `PACKAGE_PIN` values for a different board's
 pinout.
 
-## Implementation results (Vivado)
+## Implementation results (Vivado)\*
 
 `top_pipelined_basys3` implemented in Vivado for the Basys 3's Artix-7
 (`xc7a35t`, `-1` speed grade) with the 100 MHz board clock
-(`top/basys3.xdc`, 10.00 ns period). These results predate the branch
-predictor and haven't been re-run since it was added.
+(`top/basys3.xdc`, 10.00 ns period).
 
 **Utilization** — 1417 LUTs (~6.8% of the 20800 available), 1622 flip-flops
 (~3.9% of 41600), and 6 bonded IOBs. At 64 words deep each, the register file
@@ -370,3 +383,5 @@ implementation strategy (see the commit history).
 from vectorless analysis.
 
 ![Vivado power report](docs/vivado_power.png)
+
+<sub>\* Measured before the branch predictor was added.</sub>
