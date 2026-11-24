@@ -10,3 +10,6 @@ sim
 # generated Spike golden-model artifacts
 uvm/golden_model/spike_work/*
 !uvm/golden_model/spike_work/.gitkeep
+
+# SymbiYosys run directories
+formal/*/

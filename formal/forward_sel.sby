@@ -1,0 +1,26 @@
+[tasks]
+bmc
+prove
+cover
+
+[options]
+bmc:   mode bmc
+bmc:   depth 5
+prove: mode prove
+prove: depth 5
+cover: mode cover
+cover: depth 5
+
+[engines]
+smtbmc
+
+[script]
+plugin -i slang
+read_slang control_pkg.sv forward_unit.sv --top forward_sel
+read -formal control_pkg.sv forward_sel_formal.sv
+prep -top forward_sel_formal
+
+[files]
+../control_unit/control_pkg.sv
+../hazard/forward_unit.sv
+forward_sel_formal.sv
